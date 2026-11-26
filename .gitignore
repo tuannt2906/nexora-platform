@@ -1,0 +1,51 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+dist/
+build/
+*.whl
+
+# Node
+node_modules/
+apps/web/dist/
+apps/web/coverage/
+*.tsbuildinfo
+
+# Local state / evidence output (CI uploads these as artifacts, they are not source)
+.nx/
+sbom/
+*.log
+
+# Environment & secrets -- NEVER commit these. Templates (*.example) are fine.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+!deploy/**/secrets.example.*
+values.secret*.yaml
+*.secret.yaml
+*.secret.yml
+
+# Editors / OS
+.idea/
+.vscode/*
+!.vscode/extensions.json
+.DS_Store
+Thumbs.db
+
+# Helm
+deploy/helm/**/charts/*.tgz
+.import_linter_cache/
