@@ -18,7 +18,7 @@ COPY apps/web/ ./
 RUN npm run build
 
 # ---- stage 2: unprivileged nginx --------------------------------------------------------
-FROM nginxinc/nginx-unprivileged:1.30.6-alpine
+FROM nginxinc/nginx-unprivileged:1.31.7-alpine
 
 ARG GIT_SHA=unknown
 LABEL org.opencontainers.image.title="nexora-web" \
