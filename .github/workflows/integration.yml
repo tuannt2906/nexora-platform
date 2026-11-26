@@ -1,0 +1,48 @@
+name: Integration tests
+
+# Runs tests that need real services. Service containers are pinned to exact versions.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: integration-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  CI: "true"
+  NX_ONLY: python
+
+jobs:
+  postgres:
+    name: PostgreSQL migrations and API
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16.16-bookworm
+        env:
+          POSTGRES_USER: nexora_ci
+          POSTGRES_PASSWORD: ci-only-ephemeral-password  # throwaway service container, not a real secret
+          POSTGRES_DB: nexora_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U nexora_ci -d nexora_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-python-env
+      - name: Integration tests against real PostgreSQL
+        env:
+          NEXORA_TEST_DATABASE_URL: postgresql+psycopg://nexora_ci:ci-only-ephemeral-password@127.0.0.1:5432/nexora_ci
+        run: make test-integration

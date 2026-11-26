@@ -1,0 +1,54 @@
+name: Backend CI
+
+# Pull-request validation. Contains NO deployment and NO secrets.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  CI: "true"
+  NX_ONLY: python
+
+jobs:
+  quality:
+    name: Lint, types, unit and contract tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-python-env
+      - name: Lint
+        run: make lint
+      - name: Type check (mypy --strict)
+        run: make typecheck
+      - name: Unit + contract tests with one coverage gate (OpenAPI snapshot, SDK, adapter ports)
+        run: make test
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: backend-coverage
+          path: .nx/coverage.xml
+          if-no-files-found: ignore
+
+  build:
+    name: Build wheels
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-python-env
+      - run: make build

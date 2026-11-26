@@ -1,0 +1,39 @@
+name: Validate configuration
+
+# Architecture boundaries, repo policy, YAML, workflows (actionlint), compose, kustomize and Helm.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  CI: "true"
+  NX_ONLY: python
+
+jobs:
+  validate:
+    name: make validate (incl. helm lint/template, compose config, kustomize)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-python-env
+      - uses: azure/setup-helm@2f5e7bc67f1f9972ab16657bb795f36d8f04de0e # v5.1.0
+        with:
+          version: v3.22.1
+      - name: Tool versions (recorded in the log as evidence)
+        run: |
+          helm version --short
+          docker compose version
+          kubectl version --client
+      - run: make validate
