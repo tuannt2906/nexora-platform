@@ -1,0 +1,16 @@
+NEXORA {{ .Chart.AppVersion }} deployed as release "{{ .Release.Name }}" in namespace "{{ .Release.Namespace }}".
+
+Image tag : {{ include "nexora.tag" . }}
+Registry  : {{ .Values.image.registry }}
+
+1. Wait for the rollout:
+     kubectl -n {{ .Release.Namespace }} rollout status deploy/{{ include "nexora.fullname" . }}-control-plane
+     kubectl -n {{ .Release.Namespace }} rollout status deploy/{{ include "nexora.fullname" . }}-web
+
+2. Run the smoke test (see docs/operations/runbook-smoke.md):
+     kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "nexora.fullname" . }}-web 8080:80 &
+     NEXORA_API_TOKEN=<token from your secret manager> \
+       python tests/smoke/smoke.py --base-url http://127.0.0.1:8080 --token-env NEXORA_API_TOKEN
+
+Secrets are read from the Secret "{{ .Values.secrets.secretName }}" (keys NEXORA_DATABASE_URL, NEXORA_API_TOKEN),
+which is managed outside this chart.

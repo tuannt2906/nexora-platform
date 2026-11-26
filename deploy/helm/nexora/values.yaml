@@ -1,0 +1,91 @@
+# Default values. There are NO secrets in this file. The image registry and tag have no default on
+# purpose: `helm template/install` fails until an immutable release tag is supplied, e.g.
+#   --set image.registry=ghcr.io/<owner>/nexora-platform --set image.tag=<git-sha>
+image:
+  registry: ""
+  tag: ""
+  pullPolicy: IfNotPresent
+  pullSecrets: []
+
+config:
+  environment: production
+  logLevel: INFO
+  logJson: true
+  corsOrigins: ""
+
+secrets:
+  # Secret holding NEXORA_DATABASE_URL and NEXORA_API_TOKEN. It is created OUTSIDE this chart,
+  # either by External Secrets Operator (see externalSecret below) or by your secret tooling.
+  secretName: nexora-secrets
+  externalSecret:
+    enabled: false
+    refreshInterval: 1h
+    secretStoreRef:
+      kind: ClusterSecretStore
+      name: nexora-secret-store
+    remoteKeys:
+      databaseUrl: nexora/production/database-url
+      apiToken: nexora/production/api-token
+
+controlPlane:
+  replicas: 2
+  resources:
+    requests: { cpu: 100m, memory: 192Mi }
+    limits: { cpu: "1", memory: 512Mi }
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 10001
+    runAsGroup: 10001
+    fsGroup: 10001
+    seccompProfile: { type: RuntimeDefault }
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities: { drop: [ALL] }
+
+web:
+  replicas: 2
+  resources:
+    requests: { cpu: 25m, memory: 32Mi }
+    limits: { cpu: 250m, memory: 128Mi }
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 101
+    runAsGroup: 101
+    fsGroup: 101
+    seccompProfile: { type: RuntimeDefault }
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities: { drop: [ALL] }
+
+ingress:
+  enabled: false
+  className: nginx
+  host: ""
+  tlsSecretName: nexora-tls
+  annotations: {}
+
+migration:
+  # Pre-install/pre-upgrade hook Job running `python -m nexora_control_plane.migrate`.
+  enabled: true
+  activeDeadlineSeconds: 600
+
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 70
+
+podDisruptionBudget:
+  enabled: true
+  maxUnavailable: 1
+
+networkPolicy:
+  enabled: true
+
+serviceMonitor:
+  # Requires the Prometheus Operator CRDs.
+  enabled: false
+  interval: 30s
+  labels: {}

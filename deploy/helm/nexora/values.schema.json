@@ -1,0 +1,125 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["image", "config", "secrets", "controlPlane", "web", "ingress", "migration"],
+  "properties": {
+    "image": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "registry": { "type": "string" },
+        "tag": { "type": "string", "not": { "enum": ["latest"] } },
+        "pullPolicy": { "enum": ["IfNotPresent", "Always", "Never"] },
+        "pullSecrets": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "config": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "environment": { "enum": ["development", "test", "staging", "production"] },
+        "logLevel": { "enum": ["DEBUG", "INFO", "WARNING", "ERROR"] },
+        "logJson": { "type": "boolean" },
+        "corsOrigins": { "type": "string" }
+      }
+    },
+    "secrets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["secretName"],
+      "properties": {
+        "secretName": { "type": "string", "minLength": 1 },
+        "externalSecret": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "refreshInterval": { "type": "string" },
+            "secretStoreRef": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "kind": { "enum": ["SecretStore", "ClusterSecretStore"] },
+                "name": { "type": "string", "minLength": 1 }
+              }
+            },
+            "remoteKeys": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "databaseUrl": { "type": "string", "minLength": 1 },
+                "apiToken": { "type": "string", "minLength": 1 }
+              }
+            }
+          }
+        }
+      }
+    },
+    "controlPlane": { "$ref": "#/definitions/workload" },
+    "web": { "$ref": "#/definitions/workload" },
+    "ingress": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "className": { "type": "string" },
+        "host": { "type": "string" },
+        "tlsSecretName": { "type": "string" },
+        "annotations": { "type": "object" }
+      }
+    },
+    "migration": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "activeDeadlineSeconds": { "type": "integer", "minimum": 30 }
+      }
+    },
+    "autoscaling": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "minReplicas": { "type": "integer", "minimum": 1 },
+        "maxReplicas": { "type": "integer", "minimum": 1 },
+        "targetCPUUtilizationPercentage": { "type": "integer", "minimum": 1, "maximum": 100 }
+      }
+    },
+    "podDisruptionBudget": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "maxUnavailable": { "type": ["integer", "string"] }
+      }
+    },
+    "networkPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": { "enabled": { "type": "boolean" } }
+    },
+    "serviceMonitor": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "interval": { "type": "string" },
+        "labels": { "type": "object" }
+      }
+    }
+  },
+  "definitions": {
+    "workload": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "replicas": { "type": "integer", "minimum": 1 },
+        "resources": { "type": "object" },
+        "podSecurityContext": { "type": "object" },
+        "securityContext": { "type": "object" }
+      }
+    }
+  }
+}
