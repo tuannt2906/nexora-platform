@@ -1,0 +1,11 @@
+# Non-secret runtime configuration. Secrets come from the ExternalSecret-managed Secret
+# named nexora-secrets.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nexora-config
+data:
+  NEXORA_ENVIRONMENT: production
+  NEXORA_LOG_LEVEL: INFO
+  NEXORA_LOG_JSON: "true"
+  NEXORA_CORS_ORIGINS: ""

@@ -1,0 +1,21 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: nexora
+resources:
+  - namespace.yaml
+  - serviceaccount.yaml
+  - configmap.yaml
+  - externalsecret.yaml
+  - control-plane-deployment.yaml
+  - control-plane-service.yaml
+  - web-deployment.yaml
+  - web-service.yaml
+  - migrate-job.yaml
+  - ingress.yaml
+  - pdb.yaml
+  - hpa.yaml
+  - networkpolicy.yaml
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: nexora
+    includeSelectors: false
