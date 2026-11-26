@@ -1,0 +1,15 @@
+[build-system]
+requires = ["hatchling==1.33.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "nexora-sdk"
+version = "0.1.0"
+description = "Python client SDK for the NEXORA Control Plane API."
+requires-python = ">=3.11"
+license = "Apache-2.0"
+authors = [{ name = "tuannt2906" }]
+dependencies = ["httpx>=0.28,<1", "pydantic>=2.14,<3"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/nexora_sdk"]
