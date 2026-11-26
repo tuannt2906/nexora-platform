@@ -1,0 +1,24 @@
+[build-system]
+requires = ["hatchling==1.33.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "nexora-control-plane"
+version = "0.1.0"
+description = "NEXORA Control Plane API."
+requires-python = ">=3.11"
+license = "Apache-2.0"
+authors = [{ name = "tuannt2906" }]
+dependencies = [
+  "nexora-core==0.1.0",
+  "nexora-modules==0.1.0",
+  "fastapi>=0.165,<1",
+  "uvicorn>=0.54,<1",
+  "sqlalchemy>=2.1,<3",
+  "alembic>=1.20,<2",
+  "psycopg[binary]>=3.3,<4",
+  "prometheus-client>=0.26,<1",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/nexora_control_plane"]
