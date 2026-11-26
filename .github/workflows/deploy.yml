@@ -1,0 +1,107 @@
+name: Deploy
+
+# Manual, approval-gated deployment of an ALREADY RELEASED immutable image tag to a single-node
+# Docker Compose server. Source code is never deployed: only images built and scanned by
+# release.yml. Production secrets live on the server (/etc/nexora/nexora.env), not in GitHub.
+#
+# Required GitHub configuration (Settings > Environments > <environment>):
+#   - required reviewers (the approval gate)
+#   - secrets:   DEPLOY_SSH_KEY (private key), DEPLOY_KNOWN_HOSTS (pinned `ssh-keyscan` output)
+#   - variables: DEPLOY_HOST, DEPLOY_USER, DEPLOY_PATH (git checkout of this repo on the server)
+# NOTE: this workflow has not been executed yet (no repository or server existed when it was written).
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment
+        type: choice
+        options: [staging, production]
+        required: true
+      image_tag:
+        description: Full 40-character git SHA released by release.yml
+        type: string
+        required: true
+
+permissions:
+  contents: read
+  actions: read
+  packages: read
+
+concurrency:
+  group: deploy-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Verify the tag was released and scanned
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      IMAGE_TAG: ${{ inputs.image_tag }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Validate tag format
+        run: |
+          [[ "$IMAGE_TAG" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::image_tag must be a full git SHA"; exit 1; }
+      - name: A successful Release run exists for this commit
+        run: |
+          count=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow release.yml \
+            --commit "$IMAGE_TAG" --status success --json databaseId --jq 'length')
+          [ "$count" -ge 1 ] || { echo "::error::no successful release run for $IMAGE_TAG"; exit 1; }
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Both images exist for the tag
+        run: |
+          registry="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/nexora-platform"
+          for image in control-plane web; do
+            docker buildx imagetools inspect "$registry/$image:$IMAGE_TAG" > /dev/null
+          done
+
+  deploy:
+    name: Deploy to ${{ inputs.environment }}
+    needs: verify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment: ${{ inputs.environment }}
+    env:
+      IMAGE_TAG: ${{ inputs.image_tag }}
+      DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+      DEPLOY_USER: ${{ vars.DEPLOY_USER }}
+      DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
+    steps:
+      - name: Prepare SSH (pinned host key, no trust-on-first-use)
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+      - name: Pull the released commit and start the stack
+        run: |
+          ssh -i ~/.ssh/id_deploy -o StrictHostKeyChecking=yes "$DEPLOY_USER@$DEPLOY_HOST" \
+            "IMAGE_TAG='$IMAGE_TAG' DEPLOY_PATH='$DEPLOY_PATH' bash -s" <<'REMOTE'
+          set -euo pipefail
+          cd "$DEPLOY_PATH"
+          git fetch --tags --prune origin
+          git checkout --detach "$IMAGE_TAG"
+          cd deploy/compose
+          set -a; . /etc/nexora/nexora.env; set +a
+          export NEXORA_IMAGE_TAG="$IMAGE_TAG"
+          docker compose pull
+          docker compose up -d --remove-orphans --wait
+          REMOTE
+      - name: Smoke test (runs on the server, uses the server-side token)
+        run: |
+          ssh -i ~/.ssh/id_deploy -o StrictHostKeyChecking=yes "$DEPLOY_USER@$DEPLOY_HOST" \
+            "DEPLOY_PATH='$DEPLOY_PATH' bash -s" <<'REMOTE'
+          set -euo pipefail
+          cd "$DEPLOY_PATH"
+          set -a; . /etc/nexora/nexora.env; set +a
+          python3 tests/smoke/smoke.py --base-url "http://127.0.0.1:${NEXORA_WEB_PORT:-8080}" \
+            --token-env NEXORA_API_TOKEN
+          REMOTE

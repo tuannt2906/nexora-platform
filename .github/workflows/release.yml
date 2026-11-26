@@ -1,0 +1,215 @@
+name: Release
+
+# Triggered ONLY by a version tag. Re-runs every quality gate on the tagged commit, then builds
+# and publishes immutable images (tagged with the full git SHA) and the release artifacts.
+# This workflow publishes artifacts; it never deploys. Deployment is deploy.yml (manual, approved).
+on:
+  push:
+    tags: ["v[0-9]+.[0-9]+.[0-9]+"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify-ref:
+    name: Tag must point at a commit on main
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Check ancestry
+        run: |
+          # fetch-depth: 0 above already provides origin/main (no credentials are persisted)
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main \
+            || { echo "::error::tag $GITHUB_REF_NAME is not on main"; exit 1; }
+
+  backend:
+    needs: verify-ref
+    uses: ./.github/workflows/backend-ci.yml
+  frontend:
+    needs: verify-ref
+    uses: ./.github/workflows/frontend-ci.yml
+  validate:
+    needs: verify-ref
+    uses: ./.github/workflows/validate.yml
+  integration:
+    needs: verify-ref
+    uses: ./.github/workflows/integration.yml
+  security:
+    needs: verify-ref
+    uses: ./.github/workflows/security.yml
+    permissions:
+      contents: read
+      security-events: write # CodeQL job inside security.yml (skipped on private repos)
+  scan-images:
+    needs: verify-ref
+    uses: ./.github/workflows/images.yml
+
+  publish:
+    name: Publish immutable images
+    needs: [backend, frontend, validate, integration, security, scan-images]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    permissions:
+      contents: read
+      packages: write
+      id-token: write # keyless cosign signing (only used when NEXORA_SIGN_IMAGES=true)
+    outputs:
+      registry: ${{ steps.names.outputs.registry }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Compute lower-case registry path
+        id: names
+        run: echo "registry=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/nexora-platform" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Resolve base-image digests used by this build (recorded for provenance)
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          grep -hE '^FROM ' infra/docker/*.Dockerfile | awk '{print $2}' | sort -u | while read -r ref; do
+            case "$ref" in
+              *@sha256:*) echo "$ref" ;;
+              *) echo "$ref@$(docker buildx imagetools inspect "$ref" --format '{{json .Manifest.Digest}}' | tr -d '"')" ;;
+            esac
+          done | tee release/base-images.txt
+      - name: Image metadata (control-plane)
+        id: meta-cp
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ${{ steps.names.outputs.registry }}/control-plane
+          tags: |
+            type=raw,value=${{ github.sha }}
+            type=semver,pattern={{version}}
+      - name: Build and push control-plane
+        id: build-cp
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: infra/docker/control-plane.Dockerfile
+          push: true
+          tags: ${{ steps.meta-cp.outputs.tags }}
+          labels: ${{ steps.meta-cp.outputs.labels }}
+          build-args: GIT_SHA=${{ github.sha }}
+          provenance: mode=max
+          sbom: true
+      - name: Image metadata (web)
+        id: meta-web
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ${{ steps.names.outputs.registry }}/web
+          tags: |
+            type=raw,value=${{ github.sha }}
+            type=semver,pattern={{version}}
+      - name: Build and push web
+        id: build-web
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: infra/docker/web.Dockerfile
+          push: true
+          tags: ${{ steps.meta-web.outputs.tags }}
+          labels: ${{ steps.meta-web.outputs.labels }}
+          build-args: GIT_SHA=${{ github.sha }}
+          provenance: mode=max
+          sbom: true
+      - name: Record immutable digests
+        run: |
+          {
+            echo "${{ steps.names.outputs.registry }}/control-plane@${{ steps.build-cp.outputs.digest }}"
+            echo "${{ steps.names.outputs.registry }}/web@${{ steps.build-web.outputs.digest }}"
+          } | tee release/image-digests.txt
+      - name: Install cosign
+        if: ${{ vars.NEXORA_SIGN_IMAGES == 'true' }}
+        uses: sigstore/cosign-installer@881c63bd87e38389154debd8331404ce7ca8a3ab # v4.1.4
+      - name: Sign images (keyless; opt-in, signature identity becomes public in Rekor)
+        if: ${{ vars.NEXORA_SIGN_IMAGES == 'true' }}
+        run: |
+          cosign sign --yes "${{ steps.names.outputs.registry }}/control-plane@${{ steps.build-cp.outputs.digest }}"
+          cosign sign --yes "${{ steps.names.outputs.registry }}/web@${{ steps.build-web.outputs.digest }}"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-image-info
+          path: release/
+
+  release-artifacts:
+    name: Build release artifacts and GitHub Release
+    needs: publish
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      contents: write # create the GitHub Release
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-python-env
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - uses: azure/setup-helm@2f5e7bc67f1f9972ab16657bb795f36d8f04de0e # v5.1.0
+        with:
+          version: v3.22.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-image-info
+          path: release
+      - name: Python wheels
+        run: |
+          mkdir -p release/wheels
+          for pkg in packages/nexora-core packages/nexora-modules services/control-plane sdk/python; do
+            python -m build --wheel --outdir release/wheels "$pkg"
+          done
+      - name: Web bundle
+        run: |
+          npm ci --prefix apps/web
+          npm run build --prefix apps/web
+          tar -C apps/web/dist -czf release/web-dist.tar.gz .
+      - name: SBOMs (CycloneDX) for Python and web dependencies
+        run: |
+          mkdir -p release/sbom
+          cyclonedx-py requirements requirements/prod.txt --of JSON -o release/sbom/python-prod.cdx.json
+          npm sbom --sbom-format cyclonedx --omit dev --prefix apps/web > release/sbom/web.cdx.json
+      - name: Helm chart package
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          helm package deploy/helm/nexora --version "$version" --app-version "$GITHUB_SHA" \
+            --destination release/
+      - name: Render Kubernetes manifests with the immutable image tag
+        run: |
+          set -euo pipefail
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          for env in staging production; do
+            overlay="deploy/kubernetes/overlays/$env"
+            sed -i -e "s/REPLACE_WITH_OWNER/${owner}/g" -e "s/REPLACE_WITH_RELEASE_SHA/${GITHUB_SHA}/g" \
+              "$overlay/kustomization.yaml"
+            python tools/checks/deploy.py --require-substituted "$overlay"
+            kubectl kustomize "$overlay" > "release/k8s-$env.yaml"
+          done
+      - name: Checksums
+        run: |
+          cd release
+          find . -type f -print0 | sort -z | xargs -0 sha256sum > ../SHA256SUMS
+          mv ../SHA256SUMS SHA256SUMS
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mapfile -t files < <(find release -type f | sort)
+          gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes \
+            --verify-tag "${files[@]}"
