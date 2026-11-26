@@ -1,0 +1,147 @@
+# Workspace-level tooling configuration for the NEXORA Python code.
+# This file is NOT an installable project. Each Python distribution has its own
+# pyproject.toml (packages/*, services/*, sdk/*). Shared quality-tool config lives here
+# so every package is held to the same standard.
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = ["apps/web/node_modules", ".venv"]
+
+[tool.ruff.format]
+line-ending = "lf"
+
+[tool.ruff.lint]
+select = [
+  "E", "W",   # pycodestyle
+  "F",        # pyflakes
+  "I",        # isort
+  "B",        # bugbear
+  "UP",       # pyupgrade
+  "S",        # bandit-style security rules
+  "C4",       # comprehensions
+  "SIM",      # simplify
+  "RUF",      # ruff-specific
+  "PT",       # pytest style
+  "ASYNC",    # async pitfalls
+  "T20",      # no print()
+  "DTZ",      # naive datetimes
+]
+ignore = ["S101"]  # assert is fine in tests; production code uses explicit raises
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/**" = ["S105", "S106", "S311", "T20"]
+"tools/**" = ["T20", "S603", "S607"]  # CLI tooling prints and shells out by design
+
+[tool.ruff.lint.isort]
+known-first-party = ["nexora_core", "nexora_modules", "nexora_control_plane", "nexora_sdk"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+plugins = ["pydantic.mypy"]
+mypy_path = [
+  "packages/nexora-core/src",
+  "packages/nexora-modules/src",
+  "services/control-plane/src",
+  "sdk/python/src",
+]
+explicit_package_bases = true
+namespace_packages = true
+warn_unused_ignores = true
+exclude = ["(^|/)node_modules/", "(^|/)\\.venv/"]
+
+[[tool.mypy.overrides]]
+module = ["tests.*", "*.tests.*"]
+disallow_untyped_decorators = false
+
+[tool.pytest.ini_options]
+addopts = "-ra --strict-markers --strict-config --import-mode=importlib"
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+pythonpath = ["services/control-plane/tests"]
+testpaths = [
+  "packages/nexora-core/tests",
+  "packages/nexora-modules/tests",
+  "services/control-plane/tests",
+  "sdk/python/tests",
+  "tools/tests",
+]
+markers = [
+  "contract: verifies a public contract (adapter port, OpenAPI snapshot, SDK <-> API)",
+  "integration: needs real external services (Postgres, ...) supplied via environment; never run implicitly",
+]
+filterwarnings = ["error"]
+
+[tool.coverage.run]
+branch = true
+source = [
+  "packages/nexora-core/src",
+  "packages/nexora-modules/src",
+  "services/control-plane/src",
+  "sdk/python/src",
+]
+
+[tool.coverage.report]
+fail_under = 85
+show_missing = true
+skip_covered = true
+
+[tool.bandit]
+exclude_dirs = ["tests", "node_modules", ".venv"]
+# B101 (assert): only used in the pytest-facing helper nexora_core.testing; ruff S101 is ignored for the same reason.
+skips = ["B101"]
+
+[tool.importlinter]
+root_packages = ["nexora_core", "nexora_modules", "nexora_control_plane", "nexora_sdk"]
+include_external_packages = false
+
+# --- Architectural boundaries (enforced by `make validate`) ---------------------------------
+
+[[tool.importlinter.contracts]]
+name = "Layering: services -> modules -> core (never upwards)"
+type = "layers"
+layers = ["nexora_control_plane", "nexora_modules", "nexora_core"]
+
+[[tool.importlinter.contracts]]
+name = "SDK is independent of server internals"
+type = "forbidden"
+source_modules = ["nexora_sdk"]
+forbidden_modules = ["nexora_control_plane", "nexora_modules", "nexora_core"]
+
+[[tool.importlinter.contracts]]
+name = "Domain modules do not import each other (talk through core contracts)"
+type = "independence"
+modules = [
+  "nexora_modules.ingestion",
+  "nexora_modules.cdc",
+  "nexora_modules.streaming",
+  "nexora_modules.processing",
+  "nexora_modules.lakehouse",
+  "nexora_modules.query",
+  "nexora_modules.orchestration",
+  "nexora_modules.governance",
+  "nexora_modules.quality",
+  "nexora_modules.lineage",
+  "nexora_modules.observability",
+  "nexora_modules.ai",
+]
+
+[[tool.importlinter.contracts]]
+name = "Domain modules do not depend on engine adapters"
+type = "forbidden"
+source_modules = [
+  "nexora_modules.ingestion",
+  "nexora_modules.cdc",
+  "nexora_modules.streaming",
+  "nexora_modules.processing",
+  "nexora_modules.lakehouse",
+  "nexora_modules.query",
+  "nexora_modules.orchestration",
+  "nexora_modules.governance",
+  "nexora_modules.quality",
+  "nexora_modules.lineage",
+  "nexora_modules.observability",
+  "nexora_modules.ai",
+]
+forbidden_modules = ["nexora_modules.adapters"]

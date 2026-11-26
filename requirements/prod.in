@@ -1,0 +1,12 @@
+# Direct RUNTIME dependencies of the deployed services (control-plane + its libraries).
+# Compile with:  python tools/nx.py lock      (writes prod.txt with exact versions + hashes)
+fastapi>=0.165,<1
+uvicorn>=0.54,<1
+sqlalchemy>=2.1,<3
+alembic>=1.20,<2
+psycopg[binary]>=3.3,<4
+prometheus-client>=0.26,<1
+pydantic>=2.14,<3
+pydantic-settings>=2.16,<3
+httpx>=0.28,<1
+structlog>=26,<27
