@@ -1,0 +1,10 @@
+# Code owners: every path requires a review from the maintainer.
+# Enable "Require review from Code Owners" in the branch protection rule for `main`
+# once there is more than one maintainer (a sole owner cannot approve their own pull request).
+
+*                @tuannt2906
+/.github/        @tuannt2906
+/deploy/         @tuannt2906
+/infra/          @tuannt2906
+/contracts/      @tuannt2906
+/docs/adr/       @tuannt2906
