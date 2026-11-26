@@ -1,0 +1,15 @@
+[build-system]
+requires = ["hatchling==1.33.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "nexora-modules"
+version = "0.1.0"
+description = "NEXORA domain modules (ports + reference fakes) and third-party engine adapters."
+requires-python = ">=3.11"
+license = "Apache-2.0"
+authors = [{ name = "tuannt2906" }]
+dependencies = ["nexora-core==0.1.0", "pydantic>=2.14,<3"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/nexora_modules"]
