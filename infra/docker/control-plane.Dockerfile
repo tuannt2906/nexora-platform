@@ -8,7 +8,7 @@
 # (release/base-images.txt) for provenance. Never replace this with a floating tag.
 
 # ---------------------------------------------------------------- builder
-FROM python:3.11.18-slim-bookworm AS builder
+FROM python:3.15.1-slim-bookworm AS builder
 
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PIP_NO_CACHE_DIR=1 \
@@ -33,7 +33,7 @@ RUN pip install --no-cache-dir --no-deps \
       ./services/control-plane
 
 # ---------------------------------------------------------------- runtime
-FROM python:3.11.18-slim-bookworm AS runtime
+FROM python:3.15.1-slim-bookworm AS runtime
 
 ARG GIT_SHA=unknown
 ENV PATH="/opt/venv/bin:$PATH" \
