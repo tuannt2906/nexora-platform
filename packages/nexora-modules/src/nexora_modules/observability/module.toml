@@ -1,0 +1,38 @@
+id = "observability"
+title = "Observability"
+maturity = "contract"
+summary = "Instant metric queries through an engine-neutral port (Prometheus)."
+responsibilities = [
+  "Run instant PromQL queries and return typed samples",
+  "Reject empty or malformed expressions",
+  "Return empty results, not errors, for selectors that match nothing",
+]
+public_interfaces = ["nexora_modules.observability.ports.MetricsQuery"]
+depends_on = []
+engines = ["prometheus"]
+
+[[config]]
+key = "NEXORA_OBSERVABILITY_PROMETHEUS_URL"
+description = "Prometheus HTTP API endpoint"
+
+[[config]]
+key = "NEXORA_OBSERVABILITY_PROMETHEUS_TOKEN"
+description = "Bearer token for the Prometheus API, if protected"
+secret = true
+
+[[acceptance]]
+id = "OBS-1"
+criterion = "Selectors with label matchers return only matching samples; unmatched selectors return an empty result"
+status = "met"
+evidence = "packages/nexora-modules/tests/test_observability_contract.py"
+
+[[acceptance]]
+id = "OBS-2"
+criterion = "Empty or malformed expressions raise ValidationFailedError"
+status = "met"
+evidence = "packages/nexora-modules/tests/test_observability_contract.py"
+
+[[acceptance]]
+id = "OBS-3"
+criterion = "Queries return real samples from a live Prometheus scraping a platform service in CI"
+status = "planned"

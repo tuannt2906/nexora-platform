@@ -1,0 +1,41 @@
+id = "ai"
+title = "AI extensions"
+maturity = "contract"
+summary = "Embedding and LLM gateway ports with token-limit semantics. No provider is integrated yet."
+responsibilities = [
+  "Produce fixed-dimension embeddings for batches of text",
+  "Generate completions that respect max_tokens and report why generation stopped",
+  "Keep provider credentials out of the port surface",
+]
+public_interfaces = [
+  "nexora_modules.ai.ports.EmbeddingProvider",
+  "nexora_modules.ai.ports.LlmGateway",
+]
+depends_on = ["governance"]
+engines = []
+
+[[config]]
+key = "NEXORA_AI_GATEWAY_URL"
+description = "Base URL of the LLM gateway"
+
+[[config]]
+key = "NEXORA_AI_GATEWAY_API_KEY"
+description = "API key for the LLM gateway"
+secret = true
+
+[[acceptance]]
+id = "AI-1"
+criterion = "Embeddings keep input order and a constant dimension; blank text raises ValidationFailedError"
+status = "met"
+evidence = "packages/nexora-modules/tests/test_ai_contract.py"
+
+[[acceptance]]
+id = "AI-2"
+criterion = "Completions never exceed max_tokens and report LENGTH exactly when truncated"
+status = "met"
+evidence = "packages/nexora-modules/tests/test_ai_contract.py"
+
+[[acceptance]]
+id = "AI-3"
+criterion = "A real embedding/LLM provider adapter passes this contract suite in CI"
+status = "planned"
