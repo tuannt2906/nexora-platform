@@ -1,0 +1,68 @@
+# NEXORA web: static SPA + same-origin reverse proxy to the Control Plane.
+#
+# Rendered at container start by the nginx image's envsubst step
+# (/etc/nginx/templates/*.template -> /etc/nginx/conf.d/*.conf). Only variables that are
+# DEFINED in the environment are substituted, so nginx's own $variables are untouched.
+#
+#   NEXORA_API_UPSTREAM  scheme://host:port of the Control Plane, no path, no trailing slash
+#                        (default set in the Dockerfile: http://control-plane:8000).
+#                        nginx resolves the host name once at start-up: the upstream service must
+#                        exist in DNS when this container starts (compose depends_on / k8s Service).
+
+server {
+    listen 8080;
+    listen [::]:8080;
+    server_name _;
+
+    root /usr/share/nginx/html;
+    index index.html;
+
+    server_tokens off;
+    client_max_body_size 1m;
+
+    gzip on;
+    gzip_vary on;
+    gzip_min_length 1024;
+    gzip_types text/plain text/css application/javascript application/json image/svg+xml;
+
+    # Liveness/readiness of THIS container only (does not touch the Control Plane).
+    location = /healthz {
+        access_log off;
+        default_type text/plain;
+        return 200 'ok';
+    }
+
+    # API: same-origin proxy. The browser never needs the Control Plane address or CORS.
+    location /api/ {
+        include /etc/nginx/snippets/security-headers.conf;
+        add_header Cache-Control "no-store" always;
+
+        proxy_pass ${NEXORA_API_UPSTREAM};
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Request-ID $request_id;
+        proxy_connect_timeout 5s;
+        proxy_read_timeout 30s;
+    }
+
+    # Content-hashed build output: cache for a year.
+    location /assets/ {
+        include /etc/nginx/snippets/security-headers.conf;
+        add_header Cache-Control "public, max-age=31536000, immutable" always;
+        try_files $uri =404;
+    }
+
+    # The entry document must always be revalidated so a new release is picked up.
+    location = /index.html {
+        include /etc/nginx/snippets/security-headers.conf;
+        add_header Cache-Control "no-store" always;
+    }
+
+    # SPA fallback: client-side routes are served by index.html.
+    location / {
+        include /etc/nginx/snippets/security-headers.conf;
+        try_files $uri /index.html;
+    }
+}
