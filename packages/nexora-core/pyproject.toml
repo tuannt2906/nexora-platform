@@ -1,0 +1,20 @@
+[build-system]
+requires = ["hatchling==1.33.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "nexora-core"
+version = "0.1.0"
+description = "NEXORA kernel: settings, logging, errors, engine-adapter contract."
+requires-python = ">=3.11"
+license = "Apache-2.0"
+authors = [{ name = "tuannt2906" }]
+dependencies = [
+  "pydantic>=2.14,<3",
+  "pydantic-settings>=2.16,<3",
+  "httpx>=0.28,<1",
+  "structlog>=26,<27",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/nexora_core"]
