@@ -1,0 +1,39 @@
+id = "cdc"
+title = "Change data capture"
+maturity = "contract"
+summary = "Declarative lifecycle of CDC connectors (Debezium on Kafka Connect semantics)."
+responsibilities = [
+  "Deploy connectors idempotently from a declarative spec",
+  "Report connector and task state",
+  "Remove connectors cleanly",
+  "Keep credentials as references, never in the spec",
+]
+public_interfaces = ["nexora_modules.cdc.ports.CdcConnectorManager"]
+depends_on = ["streaming"]
+engines = ["kafka-connect", "kafka"]
+
+[[config]]
+key = "NEXORA_CDC_CONNECT_URL"
+description = "Kafka Connect REST endpoint"
+
+[[config]]
+key = "NEXORA_CDC_CONNECT_TOKEN"
+description = "Bearer token for the Kafka Connect REST API, if enabled"
+secret = true
+
+[[acceptance]]
+id = "CDC-1"
+criterion = "Deploying the same connector name twice updates it instead of failing"
+status = "met"
+evidence = "packages/nexora-modules/tests/test_cdc_contract.py"
+
+[[acceptance]]
+id = "CDC-2"
+criterion = "Status or removal of an unknown connector raises NotFoundError"
+status = "met"
+evidence = "packages/nexora-modules/tests/test_cdc_contract.py"
+
+[[acceptance]]
+id = "CDC-3"
+criterion = "A Debezium connector captures a Postgres table change into Kafka in the CI integration environment"
+status = "planned"

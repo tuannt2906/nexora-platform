@@ -1,0 +1,36 @@
+id = "ingestion"
+title = "Batch ingestion"
+maturity = "contract"
+summary = "Pull rows from pageable sources into lakehouse targets through engine-neutral ports."
+responsibilities = [
+  "Describe source schemas in a source-neutral type vocabulary",
+  "Read sources page by page with an opaque cursor",
+  "Submit and track ingestion jobs",
+]
+public_interfaces = [
+  "nexora_modules.ingestion.ports.IngestionSource",
+  "nexora_modules.ingestion.ports.IngestionJobRunner",
+]
+depends_on = []
+engines = ["spark", "airflow"]
+
+[[config]]
+key = "NEXORA_INGESTION_DEFAULT_BATCH_SIZE"
+description = "Rows per batch when a job does not specify one"
+
+[[acceptance]]
+id = "ING-1"
+criterion = "A source can be paged to exhaustion without losing or duplicating rows"
+status = "met"
+evidence = "packages/nexora-modules/tests/test_ingestion_contract.py"
+
+[[acceptance]]
+id = "ING-2"
+criterion = "Submitting a job for an unknown source, or querying an unknown job id, raises NotFoundError"
+status = "met"
+evidence = "packages/nexora-modules/tests/test_ingestion_contract.py"
+
+[[acceptance]]
+id = "ING-3"
+criterion = "A real adapter ingests a table into Iceberg in the CI integration environment"
+status = "planned"

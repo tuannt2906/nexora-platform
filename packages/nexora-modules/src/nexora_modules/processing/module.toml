@@ -1,0 +1,37 @@
+id = "processing"
+title = "Distributed processing"
+maturity = "contract"
+summary = "Engine-neutral submission and control of Flink/Spark jobs from immutable artifacts."
+responsibilities = [
+  "Submit batch and streaming jobs from immutable artifact references",
+  "Report job phase using one vocabulary for all engines",
+  "Cancel running jobs and refuse to cancel finished ones",
+]
+public_interfaces = ["nexora_modules.processing.ports.ProcessingEngine"]
+depends_on = ["streaming", "lakehouse"]
+engines = ["flink", "spark"]
+
+[[config]]
+key = "NEXORA_PROCESSING_FLINK_URL"
+description = "Flink JobManager REST endpoint"
+
+[[config]]
+key = "NEXORA_PROCESSING_SPARK_MASTER_URL"
+description = "Spark master / Spark Connect endpoint"
+
+[[acceptance]]
+id = "PRC-1"
+criterion = "Streaming jobs stay RUNNING until canceled; batch jobs reach a terminal phase"
+status = "met"
+evidence = "packages/nexora-modules/tests/test_processing_contract.py"
+
+[[acceptance]]
+id = "PRC-2"
+criterion = "Canceling an unknown job raises NotFoundError and canceling a terminal job raises ConflictError"
+status = "met"
+evidence = "packages/nexora-modules/tests/test_processing_contract.py"
+
+[[acceptance]]
+id = "PRC-3"
+criterion = "A Flink job and a Spark job are submitted and observed to completion against live engines in CI"
+status = "planned"

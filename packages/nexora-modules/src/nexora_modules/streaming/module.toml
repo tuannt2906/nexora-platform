@@ -1,0 +1,38 @@
+id = "streaming"
+title = "Streaming platform"
+maturity = "contract"
+summary = "Engine-neutral topic management for Kafka-compatible brokers."
+responsibilities = [
+  "List, create and describe topics",
+  "Reject duplicate topic creation explicitly",
+  "Validate topic names and sizing before any broker call",
+]
+public_interfaces = ["nexora_modules.streaming.ports.StreamingPlatform"]
+depends_on = []
+engines = ["kafka"]
+
+[[config]]
+key = "NEXORA_STREAMING_BOOTSTRAP_SERVERS"
+description = "Comma-separated Kafka bootstrap servers"
+
+[[config]]
+key = "NEXORA_STREAMING_SASL_PASSWORD"
+description = "SASL password for the broker, if authentication is enabled"
+secret = true
+
+[[acceptance]]
+id = "STR-1"
+criterion = "Topics are listed sorted; duplicate creation raises ConflictError; unknown topics raise NotFoundError"
+status = "met"
+evidence = "packages/nexora-modules/tests/test_streaming_contract.py"
+
+[[acceptance]]
+id = "STR-2"
+criterion = "Invalid topic names and partition counts are rejected at the model boundary"
+status = "met"
+evidence = "packages/nexora-modules/tests/test_streaming_contract.py"
+
+[[acceptance]]
+id = "STR-3"
+criterion = "A real Kafka adapter creates and describes a topic in the CI integration environment"
+status = "planned"
