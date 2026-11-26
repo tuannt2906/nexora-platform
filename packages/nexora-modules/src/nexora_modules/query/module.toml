@@ -1,0 +1,39 @@
+id = "query"
+title = "Federated query"
+maturity = "contract"
+summary = "Read-only SQL execution with row limits through an engine-neutral port (Trino)."
+responsibilities = [
+  "Execute read-only SQL and return typed, bounded results",
+  "Report truncation instead of silently dropping rows",
+  "Refuse non-read-only statements",
+  "Explain queries",
+]
+public_interfaces = ["nexora_modules.query.ports.QueryEngine"]
+depends_on = ["lakehouse"]
+engines = ["trino"]
+
+[[config]]
+key = "NEXORA_QUERY_TRINO_URL"
+description = "Trino coordinator endpoint"
+
+[[config]]
+key = "NEXORA_QUERY_TRINO_PASSWORD"
+description = "Password for the Trino service account"
+secret = true
+
+[[acceptance]]
+id = "QRY-1"
+criterion = "Results honour max_rows and flag truncation"
+status = "met"
+evidence = "packages/nexora-modules/tests/test_query_contract.py"
+
+[[acceptance]]
+id = "QRY-2"
+criterion = "Non-read-only SQL raises ValidationFailedError; unknown relations raise NotFoundError"
+status = "met"
+evidence = "packages/nexora-modules/tests/test_query_contract.py"
+
+[[acceptance]]
+id = "QRY-3"
+criterion = "Queries over an Iceberg table are executed against a live Trino in CI"
+status = "planned"

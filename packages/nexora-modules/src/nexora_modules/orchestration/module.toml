@@ -1,0 +1,38 @@
+id = "orchestration"
+title = "Workflow orchestration"
+maturity = "contract"
+summary = "Trigger and observe workflow runs through an engine-neutral port (Airflow)."
+responsibilities = [
+  "List the workflows the orchestrator knows",
+  "Trigger runs with string-valued run configuration",
+  "Report run state with one vocabulary",
+]
+public_interfaces = ["nexora_modules.orchestration.ports.Orchestrator"]
+depends_on = []
+engines = ["airflow"]
+
+[[config]]
+key = "NEXORA_ORCHESTRATION_AIRFLOW_URL"
+description = "Airflow API endpoint"
+
+[[config]]
+key = "NEXORA_ORCHESTRATION_AIRFLOW_TOKEN"
+description = "Airflow API token"
+secret = true
+
+[[acceptance]]
+id = "ORC-1"
+criterion = "Workflows are listed sorted; a triggered run carries its conf and is queryable by id"
+status = "met"
+evidence = "packages/nexora-modules/tests/test_orchestration_contract.py"
+
+[[acceptance]]
+id = "ORC-2"
+criterion = "Triggering an unknown workflow or querying an unknown run raises NotFoundError"
+status = "met"
+evidence = "packages/nexora-modules/tests/test_orchestration_contract.py"
+
+[[acceptance]]
+id = "ORC-3"
+criterion = "A DAG run is triggered and observed to success against a live Airflow in CI"
+status = "planned"

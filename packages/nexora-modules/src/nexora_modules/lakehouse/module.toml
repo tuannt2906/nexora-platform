@@ -1,0 +1,50 @@
+id = "lakehouse"
+title = "Lakehouse catalog and storage"
+maturity = "contract"
+summary = "Read-side table catalog (Iceberg REST) and S3-compatible object storage ports."
+responsibilities = [
+  "Browse namespaces and tables of the catalog",
+  "Load table metadata (schema, location, current snapshot)",
+  "Put, get and list objects in object storage",
+]
+public_interfaces = [
+  "nexora_modules.lakehouse.ports.TableCatalog",
+  "nexora_modules.lakehouse.ports.ObjectStore",
+]
+depends_on = []
+engines = ["iceberg-rest-catalog", "object-store-s3"]
+
+[[config]]
+key = "NEXORA_LAKEHOUSE_CATALOG_URL"
+description = "Iceberg REST catalog endpoint"
+
+[[config]]
+key = "NEXORA_LAKEHOUSE_S3_ENDPOINT"
+description = "S3-compatible object store endpoint"
+
+[[config]]
+key = "NEXORA_LAKEHOUSE_S3_ACCESS_KEY"
+description = "Object store access key id"
+secret = true
+
+[[config]]
+key = "NEXORA_LAKEHOUSE_S3_SECRET_KEY"
+description = "Object store secret access key"
+secret = true
+
+[[acceptance]]
+id = "LKH-1"
+criterion = "Catalog listings are sorted and unknown namespaces/tables raise NotFoundError"
+status = "met"
+evidence = "packages/nexora-modules/tests/test_lakehouse_contract.py"
+
+[[acceptance]]
+id = "LKH-2"
+criterion = "Object store round-trips bytes, lists by prefix in key order and raises NotFoundError for unknown keys"
+status = "met"
+evidence = "packages/nexora-modules/tests/test_lakehouse_contract.py"
+
+[[acceptance]]
+id = "LKH-3"
+criterion = "The catalog and object-store ports are verified against a live Iceberg REST catalog and MinIO in CI"
+status = "planned"
