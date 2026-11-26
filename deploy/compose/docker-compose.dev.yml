@@ -1,0 +1,20 @@
+# Development override: build images from the working tree instead of pulling release images.
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml --env-file .env up --build
+# Not for production: production always pulls an immutable, CI-built tag.
+services:
+  migrate:
+    build:
+      context: ../..
+      dockerfile: infra/docker/control-plane.Dockerfile
+      args:
+        GIT_SHA: ${NEXORA_IMAGE_TAG:-dev}
+  control-plane:
+    build:
+      context: ../..
+      dockerfile: infra/docker/control-plane.Dockerfile
+      args:
+        GIT_SHA: ${NEXORA_IMAGE_TAG:-dev}
+  web:
+    build:
+      context: ../..
+      dockerfile: infra/docker/web.Dockerfile

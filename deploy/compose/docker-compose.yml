@@ -1,0 +1,115 @@
+# NEXORA single-node deployment (Docker Compose).
+#
+# Usage on a server (after `git pull`):
+#   cp .env.example .env && $EDITOR .env      # fill in values; .env is git-ignored
+#   docker compose --env-file .env -f docker-compose.yml pull
+#   docker compose --env-file .env -f docker-compose.yml up -d
+#
+# Rules:
+#   * no secret appears in this file: every secret is a required variable (${VAR:?message});
+#   * application images use an immutable tag (NEXORA_IMAGE_TAG = git SHA), never `latest`;
+#   * only the web tier publishes a host port; Postgres and the API stay on the internal network.
+name: nexora
+
+x-hardening: &hardening
+  read_only: true
+  cap_drop: [ALL]
+  security_opt:
+    - no-new-privileges:true
+  tmpfs:
+    - /tmp
+
+services:
+  postgres:
+    image: postgres:16.16-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: nexora
+      POSTGRES_USER: nexora
+      POSTGRES_PASSWORD: ${NEXORA_POSTGRES_PASSWORD:?set NEXORA_POSTGRES_PASSWORD in .env}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nexora -d nexora"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
+    networks: [backend]
+    security_opt:
+      - no-new-privileges:true
+
+  migrate:
+    image: ${NEXORA_IMAGE_REGISTRY:?set NEXORA_IMAGE_REGISTRY in .env}/control-plane:${NEXORA_IMAGE_TAG:?set NEXORA_IMAGE_TAG to an immutable release tag}
+    command: ["python", "-m", "nexora_control_plane.migrate"]
+    restart: "no"
+    environment:
+      NEXORA_ENVIRONMENT: ${NEXORA_ENVIRONMENT:-production}
+      NEXORA_DATABASE_URL: postgresql+psycopg://nexora:${NEXORA_POSTGRES_PASSWORD:?set NEXORA_POSTGRES_PASSWORD in .env}@postgres:5432/nexora
+      NEXORA_API_TOKEN: ${NEXORA_API_TOKEN:?set NEXORA_API_TOKEN in .env}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [backend]
+    <<: *hardening
+
+  control-plane:
+    image: ${NEXORA_IMAGE_REGISTRY:?set NEXORA_IMAGE_REGISTRY in .env}/control-plane:${NEXORA_IMAGE_TAG:?set NEXORA_IMAGE_TAG to an immutable release tag}
+    restart: unless-stopped
+    environment:
+      NEXORA_ENVIRONMENT: ${NEXORA_ENVIRONMENT:-production}
+      NEXORA_LOG_LEVEL: ${NEXORA_LOG_LEVEL:-INFO}
+      NEXORA_LOG_JSON: "true"
+      NEXORA_DATABASE_URL: postgresql+psycopg://nexora:${NEXORA_POSTGRES_PASSWORD:?set NEXORA_POSTGRES_PASSWORD in .env}@postgres:5432/nexora
+      NEXORA_API_TOKEN: ${NEXORA_API_TOKEN:?set NEXORA_API_TOKEN in .env}
+      NEXORA_CORS_ORIGINS: ${NEXORA_CORS_ORIGINS:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=2).status == 200 else 1)"
+      interval: 15s
+      timeout: 3s
+      retries: 5
+      start_period: 20s
+    networks: [backend, frontend]
+    <<: *hardening
+
+  web:
+    image: ${NEXORA_IMAGE_REGISTRY:?set NEXORA_IMAGE_REGISTRY in .env}/web:${NEXORA_IMAGE_TAG:?set NEXORA_IMAGE_TAG to an immutable release tag}
+    restart: unless-stopped
+    environment:
+      NEXORA_API_UPSTREAM: http://control-plane:8000
+    ports:
+      - "${NEXORA_WEB_PORT:-8080}:8080"
+    depends_on:
+      control-plane:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    networks: [frontend]
+    # nginx renders its config from a template at start-up, so the root FS stays writable here;
+    # the Kubernetes manifests use read-only root + emptyDir mounts instead.
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp
+
+networks:
+  backend:
+    internal: true
+  frontend:
+
+volumes:
+  postgres-data:
