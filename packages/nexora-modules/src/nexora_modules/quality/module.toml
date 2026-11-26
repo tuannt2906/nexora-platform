@@ -1,0 +1,33 @@
+id = "quality"
+title = "Data quality"
+maturity = "functional"
+summary = "Declarative column rules (not-null, unique, range, regex, accepted values) evaluated in-process."
+responsibilities = [
+  "Validate rule definitions before evaluation",
+  "Evaluate rules over row sets with documented NULL semantics",
+  "Report per-rule failure counts",
+]
+public_interfaces = ["nexora_modules.quality.ports.QualityEvaluator"]
+depends_on = []
+engines = []
+
+[[config]]
+key = "NEXORA_QUALITY_MAX_ROWS"
+description = "Upper bound of rows evaluated in-process before a pushdown engine must be used"
+
+[[acceptance]]
+id = "QLT-1"
+criterion = "not_null, unique, range, regex and accepted_values count failing rows according to the documented NULL semantics"
+status = "met"
+evidence = "packages/nexora-modules/tests/test_quality_contract.py"
+
+[[acceptance]]
+id = "QLT-2"
+criterion = "Invalid rule definitions (missing parameters, min > max, bad regex) are rejected; duplicate rule ids raise ValidationFailedError"
+status = "met"
+evidence = "packages/nexora-modules/tests/test_quality_contract.py"
+
+[[acceptance]]
+id = "QLT-3"
+criterion = "Rules are evaluated over Iceberg tables with Trino/Spark pushdown against live engines in CI"
+status = "planned"

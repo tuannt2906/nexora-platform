@@ -1,0 +1,36 @@
+id = "governance"
+title = "Governance"
+maturity = "contract"
+summary = "Default-deny policy decisions and an append-only audit trail behind engine-neutral ports."
+responsibilities = [
+  "Decide whether a subject may perform an action on a resource",
+  "Default to deny when no rule matches",
+  "Record audit events append-only",
+]
+public_interfaces = [
+  "nexora_modules.governance.ports.PolicyDecisionPoint",
+  "nexora_modules.governance.ports.AuditSink",
+]
+depends_on = []
+engines = []
+
+[[config]]
+key = "NEXORA_GOVERNANCE_POLICY_ENDPOINT"
+description = "External policy decision point endpoint, when not evaluated in-process"
+
+[[acceptance]]
+id = "GOV-1"
+criterion = "A request with no matching allow rule is denied"
+status = "met"
+evidence = "packages/nexora-modules/tests/test_governance_contract.py"
+
+[[acceptance]]
+id = "GOV-2"
+criterion = "Audit records are retained in order with timezone-aware timestamps"
+status = "met"
+evidence = "packages/nexora-modules/tests/test_governance_contract.py"
+
+[[acceptance]]
+id = "GOV-3"
+criterion = "Policies are enforced by an external policy engine and audit records are persisted durably, verified in CI"
+status = "planned"

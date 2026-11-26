@@ -1,0 +1,38 @@
+id = "lineage"
+title = "Data lineage"
+maturity = "contract"
+summary = "OpenLineage-style run events delivered through an engine-neutral sink port."
+responsibilities = [
+  "Model run events with OpenLineage field names",
+  "Require timezone-aware event times",
+  "Deliver events idempotently to a lineage backend",
+]
+public_interfaces = ["nexora_modules.lineage.ports.LineageSink"]
+depends_on = []
+engines = ["openlineage"]
+
+[[config]]
+key = "NEXORA_LINEAGE_ENDPOINT"
+description = "OpenLineage-compatible backend URL"
+
+[[config]]
+key = "NEXORA_LINEAGE_API_KEY"
+description = "API key for the lineage backend"
+secret = true
+
+[[acceptance]]
+id = "LIN-1"
+criterion = "Events serialise with OpenLineage camelCase field names and reject naive timestamps"
+status = "met"
+evidence = "packages/nexora-modules/tests/test_lineage_contract.py"
+
+[[acceptance]]
+id = "LIN-2"
+criterion = "Redelivering an event does not duplicate it; dataset edges derive from COMPLETE events"
+status = "met"
+evidence = "packages/nexora-modules/tests/test_lineage_contract.py"
+
+[[acceptance]]
+id = "LIN-3"
+criterion = "Events are accepted by a live OpenLineage backend (Marquez) in CI"
+status = "planned"
