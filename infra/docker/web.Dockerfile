@@ -25,6 +25,11 @@ LABEL org.opencontainers.image.title="nexora-web" \
       org.opencontainers.image.description="NEXORA Control Plane web console" \
       org.opencontainers.image.revision="${GIT_SHA}"
 
+# Apply OS security fixes published after the base image was built. Trade-off: a rebuild is
+# not bit-for-bit reproducible, but it never ships known-fixable CVEs (the CI scan enforces it).
+USER root
+RUN apk upgrade --no-cache
+
 # Control Plane address used by the /api/ reverse proxy (override at runtime).
 ENV NEXORA_API_UPSTREAM=http://control-plane:8000
 
@@ -36,6 +41,9 @@ COPY --from=build --chmod=0755 /app/dist /usr/share/nginx/html
 # Read-only root filesystem: mount writable emptyDir/tmpfs volumes at /tmp (pid file and
 # nginx temp dirs) and /etc/nginx/conf.d (the entrypoint renders the template there).
 EXPOSE 8080
+
+# Explicit non-root user (uid 101 is `nginx` in nginx-unprivileged).
+USER 101
 
 HEALTHCHECK --interval=15s --timeout=3s --start-period=5s --retries=3 \
   CMD wget -q -O /dev/null http://127.0.0.1:8080/healthz || exit 1

@@ -31,6 +31,8 @@ RUN pip install --no-cache-dir --no-deps \
       ./packages/nexora-core \
       ./packages/nexora-modules \
       ./services/control-plane
+# Build tooling is not needed at runtime and ships vendored libraries that scanners flag.
+RUN pip uninstall -y setuptools wheel
 
 # ---------------------------------------------------------------- runtime
 FROM python:3.11.18-slim-bookworm AS runtime
@@ -47,6 +49,9 @@ LABEL org.opencontainers.image.title="nexora-control-plane" \
 
 RUN groupadd --system --gid 10001 nexora \
  && useradd --system --uid 10001 --gid 10001 --no-create-home --shell /usr/sbin/nologin nexora
+
+# Same for the base image's own interpreter (setuptools/wheel are not used at runtime).
+RUN /usr/local/bin/python -m pip uninstall -y setuptools wheel
 
 COPY --from=builder /opt/venv /opt/venv
 
