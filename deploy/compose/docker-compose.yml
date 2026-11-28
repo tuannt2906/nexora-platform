@@ -21,7 +21,7 @@ x-hardening: &hardening
 
 services:
   postgres:
-    image: postgres:16.16-bookworm
+    image: postgres:19.0-bookworm
     restart: unless-stopped
     environment:
       POSTGRES_DB: nexora
