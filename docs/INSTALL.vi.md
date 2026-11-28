@@ -50,7 +50,7 @@ cd /opt/nexora && set -a && . /etc/nexora/nexora.env && set +a
 python3 tests/smoke/smoke.py --base-url http://127.0.0.1:${NEXORA_WEB_PORT:-8080} --token-env NEXORA_API_TOKEN
 ```
 
-Kết quả mong đợi: `5/5 smoke checks passed`. Mở `http://<server>:8080`, dán `NEXORA_API_TOKEN`.
+Kết quả mong đợi: `4/4 smoke checks passed` (mục metrics báo SKIP vì `/metrics` không được public qua web). Mở `http://<server>:8080`, dán `NEXORA_API_TOKEN`.
 
 Lưu ý quan trọng:
 - Image trên GHCR mặc định ở chế độ **private**. Sau lần release đầu tiên: đặt 2 package (`control-plane`, `web`)

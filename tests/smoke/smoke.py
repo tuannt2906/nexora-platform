@@ -4,8 +4,9 @@
     NEXORA_API_TOKEN=... python tests/smoke/smoke.py --base-url http://127.0.0.1:8080 \
         --token-env NEXORA_API_TOKEN [--wait-seconds 60]
 
-It proves that a deployment is *wired* correctly (liveness, readiness incl. database, metrics,
-authentication enforced, authenticated API reachable). It does NOT prove production readiness:
+It proves that a deployment is *wired* correctly (liveness, readiness incl. database, authentication
+enforced, authenticated API reachable, and metrics when --metrics-url is given: /metrics is
+deliberately NOT exposed through the web tier). It does NOT prove production readiness:
 see docs/operations/runbook-smoke.md for what else must be checked.
 
 Exit codes: 0 all checks passed, 1 at least one check failed, 2 usage/configuration error.
@@ -62,13 +63,30 @@ def _expect_status(path: str, expected: int, *, auth: bool) -> Callable[[str, st
     return run
 
 
-def _metrics(base_url: str, _token: str) -> str | None:
-    response = http_get(base_url + "/metrics")
+def _readyz(base_url: str, _token: str) -> str | None:
+    response = http_get(base_url + "/readyz")
     if response.status != 200:
-        return f"GET /metrics -> HTTP {response.status}, expected 200"
-    if b"# HELP" not in response.body:
-        return "GET /metrics did not return Prometheus exposition text"
+        return f"GET /readyz -> HTTP {response.status}, expected 200"
+    try:
+        body = json.loads(response.body)
+    except ValueError:
+        # e.g. the SPA fallback page answering instead of the API: that is NOT a readiness proof
+        return "GET /readyz did not return the API JSON (is the route proxied to the API?)"
+    if not isinstance(body, dict) or body.get("status") != "ready":
+        return f"GET /readyz reported {body!r}, expected status 'ready'"
     return None
+
+
+def metrics_check(metrics_url: str) -> Check:
+    def run(_base_url: str, _token: str) -> str | None:
+        response = http_get(metrics_url)
+        if response.status != 200:
+            return f"GET {metrics_url} -> HTTP {response.status}, expected 200"
+        if b"# HELP" not in response.body:
+            return f"GET {metrics_url} did not return Prometheus exposition text"
+        return None
+
+    return Check("metrics   (direct, --metrics-url)", run)
 
 
 def _platform(base_url: str, token: str) -> str | None:
@@ -86,8 +104,7 @@ def _platform(base_url: str, token: str) -> str | None:
 
 CHECKS: tuple[Check, ...] = (
     Check("liveness  /healthz", _expect_status("/healthz", 200, auth=False)),
-    Check("readiness /readyz (database reachable)", _expect_status("/readyz", 200, auth=False)),
-    Check("metrics   /metrics", _metrics),
+    Check("readiness /readyz (database reachable)", _readyz),
     Check(
         "auth enforced: /api/v1/platform without token -> 401",
         _expect_status("/api/v1/platform", 401, auth=False),
@@ -108,9 +125,12 @@ def wait_until_ready(base_url: str, seconds: float) -> None:
         time.sleep(2)
 
 
-def run_checks(base_url: str, token: str) -> list[tuple[str, str | None]]:
+def run_checks(
+    base_url: str, token: str, metrics_url: str | None = None
+) -> list[tuple[str, str | None]]:
     results: list[tuple[str, str | None]] = []
-    for check in CHECKS:
+    checks = (*CHECKS, metrics_check(metrics_url)) if metrics_url else CHECKS
+    for check in checks:
         try:
             problem = check.run(base_url, token)
         except (OSError, ValueError) as exc:
@@ -126,6 +146,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--base-url", required=True, help="e.g. https://nexora.example.com")
     parser.add_argument("--token-env", default="NEXORA_API_TOKEN", help="env var holding the token")
     parser.add_argument("--wait-seconds", type=float, default=0.0, help="wait for /readyz first")
+    parser.add_argument(
+        "--metrics-url",
+        default=None,
+        help="full URL of /metrics reached directly (not exposed through the web tier)",
+    )
     args = parser.parse_args(argv)
 
     token = os.environ.get(args.token_env, "")
@@ -141,13 +166,16 @@ def main(argv: list[str] | None = None) -> int:
         wait_until_ready(base_url, args.wait_seconds)
 
     failures = 0
-    for name, problem in run_checks(base_url, token):
+    results = run_checks(base_url, token, args.metrics_url)
+    if not args.metrics_url:
+        sys.stdout.write("SKIP  metrics (not exposed via the web tier; pass --metrics-url)\n")
+    for name, problem in results:
         if problem is None:
             sys.stdout.write(f"PASS  {name}\n")
         else:
             failures += 1
             sys.stdout.write(f"FAIL  {name}\n        {problem}\n")
-    sys.stdout.write(f"\n{len(CHECKS) - failures}/{len(CHECKS)} smoke checks passed\n")
+    sys.stdout.write(f"\n{len(results) - failures}/{len(results)} smoke checks passed\n")
     return 1 if failures else 0
 
 

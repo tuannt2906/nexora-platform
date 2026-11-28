@@ -31,7 +31,9 @@ def _load_smoke() -> ModuleType:
 smoke = _load_smoke()
 
 
-def _handler(*, ready: bool = True, enforce_auth: bool = True) -> type[BaseHTTPRequestHandler]:
+def _handler(
+    *, ready: bool = True, enforce_auth: bool = True, html_readyz: bool = False
+) -> type[BaseHTTPRequestHandler]:
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, format: str, *args: object) -> None:
             return
@@ -47,7 +49,10 @@ def _handler(*, ready: bool = True, enforce_auth: bool = True) -> type[BaseHTTPR
             if self.path == "/healthz":
                 self._send(200, b'{"status":"ok"}')
             elif self.path == "/readyz":
-                self._send(200 if ready else 503, b'{"status":"x"}')
+                if html_readyz:  # what the web tier's SPA fallback would answer
+                    self._send(200, b"<html>app</html>", "text/html")
+                else:
+                    self._send(200 if ready else 503, b'{"status":"ready"}')
             elif self.path == "/metrics":
                 self._send(200, b"# HELP up test\n# TYPE up gauge\nup 1\n", "text/plain")
             elif self.path == "/api/v1/platform":
@@ -83,7 +88,8 @@ def test_all_checks_pass_against_healthy_server(
         code = smoke.main(["--base-url", url, "--token-env", "SMOKE_TOKEN"])
     out = capsys.readouterr().out
     assert code == 0
-    assert "5/5 smoke checks passed" in out
+    assert "4/4 smoke checks passed" in out
+    assert "SKIP  metrics" in out
 
 
 def test_fails_when_not_ready(
@@ -123,7 +129,7 @@ def test_unreachable_server_is_reported_not_raised(
     monkeypatch.setenv("SMOKE_TOKEN", TOKEN)
     code = smoke.main(["--base-url", "http://127.0.0.1:1", "--token-env", "SMOKE_TOKEN"])
     assert code == 1
-    assert "0/5 smoke checks passed" in capsys.readouterr().out
+    assert "0/4 smoke checks passed" in capsys.readouterr().out
 
 
 def test_missing_token_is_usage_error(
@@ -143,3 +149,31 @@ def test_wait_until_ready_returns_when_ready(monkeypatch: pytest.MonkeyPatch) ->
     monkeypatch.setenv("SMOKE_TOKEN", TOKEN)
     with _server() as url:
         smoke.wait_until_ready(url, 5)  # must return promptly, not exhaust the budget
+
+
+def test_metrics_checked_when_url_given(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("SMOKE_TOKEN", TOKEN)
+    with _server() as url:
+        code = smoke.main(
+            ["--base-url", url, "--token-env", "SMOKE_TOKEN", "--metrics-url", url + "/metrics"]
+        )
+        out = capsys.readouterr().out
+        assert code == 0
+        assert "5/5 smoke checks passed" in out
+        code = smoke.main(
+            ["--base-url", url, "--token-env", "SMOKE_TOKEN", "--metrics-url", url + "/nope"]
+        )
+    assert code == 1
+    assert "FAIL  metrics" in capsys.readouterr().out
+
+
+def test_html_instead_of_api_readiness_is_not_a_pass(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("SMOKE_TOKEN", TOKEN)
+    with _server(html_readyz=True) as url:
+        code = smoke.main(["--base-url", url, "--token-env", "SMOKE_TOKEN"])
+    assert code == 1
+    assert "did not return the API JSON" in capsys.readouterr().out

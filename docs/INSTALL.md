@@ -118,7 +118,7 @@ set -a; . /etc/nexora/nexora.env; set +a
 python3 tests/smoke/smoke.py --base-url "http://127.0.0.1:${NEXORA_WEB_PORT:-8080}" --token-env NEXORA_API_TOKEN
 ```
 
-Expect `5/5 smoke checks passed`. Then open `http://<server>:8080` (or your TLS URL) and paste `NEXORA_API_TOKEN`.
+Expect `4/4 smoke checks passed` (the metrics check is reported as SKIP because `/metrics` is not exposed through the web tier). Then open `http://<server>:8080` (or your TLS URL) and paste `NEXORA_API_TOKEN`.
 
 ### 2.6 TLS and exposure
 

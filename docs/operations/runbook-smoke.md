@@ -15,9 +15,9 @@ Exit code `0` = all checks passed, `1` = at least one failed, `2` = usage/config
 
 | Check | Proves | If it fails |
 |-------|--------|-------------|
-| `GET /healthz` -> 200 | process is up and serving HTTP through the whole path (proxy/ingress -> web -> api) | check pods/containers, ingress, TLS, DNS |
-| `GET /readyz` -> 200 | the API can reach PostgreSQL | check `NEXORA_DATABASE_URL`, DB reachability, NetworkPolicy egress 5432, migrations ran |
-| `GET /metrics` shows Prometheus text | metrics endpoint is wired (alerting can work) | check the route is not blocked by the proxy |
+| `GET /healthz` -> 200 | the **web tier** (nginx) is up and reachable through the proxy/ingress/TLS path; it is answered by nginx itself and does not touch the API | check containers/pods, ingress, TLS, DNS |
+| `GET /readyz` -> 200 `{"status":"ready"}` | the request reached the API through the web tier and the API can reach PostgreSQL (an HTML answer is a failure: it means the route is not proxied) | check `NEXORA_DATABASE_URL`, DB reachability, NetworkPolicy egress 5432, migrations ran |
+| `--metrics-url` (optional) shows Prometheus text | metrics are wired. `/metrics` is deliberately **not** exposed through the web tier, so pass a direct URL (e.g. via `kubectl port-forward svc/<api> 8000:8000` -> `http://127.0.0.1:8000/metrics`); without it the check is reported as SKIP | check the API service and that Prometheus can scrape it from the monitoring namespace |
 | `GET /api/v1/platform` **without** token -> 401 | authentication is actually enforced | **stop and escalate**: the API may be open |
 | `GET /api/v1/platform` **with** token -> 200 JSON with `version` | the secret, the API and the response contract agree | token mismatch between secret manager and pods; check `NEXORA_API_TOKEN` rollout |
 
