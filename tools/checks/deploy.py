@@ -457,7 +457,7 @@ def _exec(
     *,
     cwd: Path,
     env: dict[str, str] | None = None,
-    expect_failure_containing: str | None = None,
+    expect_failure_containing: str | tuple[str, ...] | None = None,
 ) -> Step:
     full_env = {**os.environ, **(env or {})}
     try:
@@ -475,7 +475,12 @@ def _exec(
     output = (proc.stdout + proc.stderr).strip()
     tail = output.splitlines()[-8:]
     if expect_failure_containing is not None:
-        if proc.returncode != 0 and expect_failure_containing in output:
+        needles = (
+            (expect_failure_containing,)
+            if isinstance(expect_failure_containing, str)
+            else expect_failure_containing
+        )
+        if proc.returncode != 0 and any(needle in output for needle in needles):
             return (label, "pass", [])
         return (
             label,
@@ -569,7 +574,8 @@ def optional_steps(root: Path) -> list[Step]:
                     "image.tag=latest",
                 ],
                 cwd=root,
-                expect_failure_containing="image.tag",
+                # schema errors name the JSON pointer (/image/tag); the template helper says image.tag
+                expect_failure_containing=("image.tag", "/image/tag"),
             )
         )
 
