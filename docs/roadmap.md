@@ -7,7 +7,7 @@ until its exit criteria are demonstrated, not merely configured.
 | # | Milestone | Scope | Exit criteria |
 |---|---|---|---|
 | **M0** | **Foundation** (this repository state) | monorepo, ADRs, conventions, control plane (connections, audit, health, metrics, migrations), 12 module ports with fakes, 10 engine probe adapters, SDK, React UI, CI/CD workflows, deploy assets, quality gates | all local gates pass; workflows lint clean; CI-only items listed honestly |
-| **M0.5** | **First run in GitHub** | push, enable branch protection and secret scanning, fix whatever CI finds | all PR workflows green on `main`; images built, scanned, SBOM produced |
+| **M0.5** ✅ | **First run in GitHub** (done 2026-11-28) | push, enable branch protection and secret scanning, fix whatever CI finds | all PR workflows green on `main`; images built, scanned, SBOM produced |
 | **M1** | **Identity and access** | OIDC login, service tokens, RBAC through the governance policy port, real audit actors (ADR-0006) | e2e test: unauthenticated and unauthorized requests rejected; audit shows subject |
 | **M2** | **First server deployment** | deploy via compose on the dedicated server, TLS, backups scheduled, restore drill executed, upgrade + rollback rehearsed | smoke test green on the server; drill record committed |
 | **M3** | **Live-engine integration harness** | CI jobs that start real engines (MinIO, Iceberg REST catalog, Trino first) and run the shared port contract suites; promote probes to verified; first `functional` adapters (Trino `QueryEngine`, Iceberg `TableCatalog`, S3 `ObjectStore`) | contract suites pass against real engines in CI; maturity promoted with evidence |
@@ -21,6 +21,5 @@ until its exit criteria are demonstrated, not merely configured.
 
 - No engine adapter is above `probe`; no domain port is backed by a real engine.
 - Authentication is a single shared token (ADR-0006).
-- Images, Helm rendering, the integration job, the release and deploy workflows have not run yet.
-- The Python lock file was resolved on Windows; CI installs it on Linux and will expose any gap.
-- `CODEOWNERS` contains no owners until real handles are filled in.
+- The release and deploy workflows have not run yet (images, Helm and PostgreSQL integration were verified in CI).
+- Single maintainer: no required reviews on `main`.

@@ -1,6 +1,6 @@
 # Project status
 
-_Milestone M0 (foundation). Last updated: 2026-11-26. Evidence for every "done" below is in
+_Milestone M0 (foundation), published at <https://github.com/tuannt2906/nexora-platform>. Last updated: 2026-11-28. Evidence for every "done" below is in
 [TEST_EVIDENCE.md](TEST_EVIDENCE.md); anything not listed there as executed is not claimed._
 
 ## Summary
@@ -15,8 +15,8 @@ _Milestone M0 (foundation). Last updated: 2026-11-26. Evidence for every "done" 
 | Python SDK | **done (M0 scope)** | typed async client, contract-tested against the real app and the OpenAPI snapshot |
 | Web UI | **done (M0 scope)** | overview, modules, adapters, connections, audit; token screen |
 | Quality gates | **done** | `lint`, `typecheck`, `test`, `test-unit`, `test-contract`, `validate`, `build`, `security-check` execute real tools |
-| CI/CD workflows | **written, not yet run** | actionlint clean; never executed on GitHub (no remote yet) |
-| Deployment assets | **written, partly validated** | compose + kustomize render and pass policy checks locally; Helm, images, real server **not yet validated** |
+| CI/CD workflows | **PR workflows green on GitHub** | backend, frontend, integration (real PostgreSQL), validate (real Helm), security + CodeQL, images (build, Trivy, SBOM), end-to-end compose smoke. `release.yml` and `deploy.yml` have **not run yet** |
+| Deployment assets | **validated in CI, not on a server** | compose stack runs end-to-end in CI; kustomize and Helm render; images build and pass Trivy. No real server or cluster has been used |
 | Authentication | **minimal** | one shared bearer token; OIDC/RBAC planned (ADR-0006) |
 
 ## Domain module maturity
@@ -59,17 +59,17 @@ confirmed against live engines. See [`contracts/adapters/`](../../contracts/adap
 
 ## Risks and caveats
 
-1. **Lock file portability.** `requirements/*.txt` were resolved on Windows. Packages with Linux-only
-   dependencies would be missing; CI installs on Linux and will show it.
-2. **Image digests** are resolved at release time, not committed. Base-image tags (`python:3.11.18-slim-bookworm`,
-   `postgres:16.16-bookworm`) were the newest patch releases listed on Docker Hub on 2026-11-26; Trivy may still
-   report fixable vulnerabilities in CI, which blocks publishing until the tags are bumped.
-3. **Helm chart** was never rendered by Helm (not installed locally); CI runs `helm lint` and `helm template`.
-4. **TypeScript 5.9** instead of 7.x until `typescript-eslint` and `openapi-typescript` support newer majors.
-5. **GitHub actions** are pinned to SHAs resolved with `git ls-remote` on 2026-11-26; review them before first
-   use (supply-chain hygiene) and let Dependabot maintain them.
-6. **`CODEOWNERS`** has no owners until real handles are added; `SECURITY.md` has a TODO for a contact.
+1. **Image CVE drift.** Trivy fails the build on fixable HIGH/CRITICAL findings. New CVEs appear without code
+   changes, so images must be rebuilt regularly (weekly `security.yml` schedule, Dependabot, release workflow).
+   The web image uses Alpine's nginx package because the upstream nginx-unprivileged image lagged behind.
+2. **Image digests** are resolved at release time, not committed; base images use exact tags.
+3. **`release.yml` and `deploy.yml` are untested.** The first tag will exercise them; expect small fixes.
+4. **GHCR packages are private by default**; after the first release set them to Public (or use a read token).
+5. **TypeScript 5.9** instead of 7.x until `typescript-eslint` and `openapi-typescript` support newer majors.
+6. **GitHub actions** are pinned to SHAs resolved with `git ls-remote` on 2026-11-26; Dependabot maintains them.
+7. **Single maintainer**: `CODEOWNERS` lists one owner and branch protection does not require reviews.
 
 ## Next
 
-Push to GitHub and make the PR workflows green (M0.5), then follow [roadmap.md](../roadmap.md).
+M0.5 (push, green PR workflows, repository protection) is done. Next: first release tag, first server
+deployment (M2) and identity/access (M1), following [roadmap.md](../roadmap.md).
