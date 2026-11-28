@@ -11,7 +11,7 @@
 # occasionally and was found to contain fixable HIGH/CRITICAL CVEs (Trivy gate in CI).
 
 # ---- stage 1: build the static bundle ---------------------------------------------------
-FROM node:24.22.3-alpine3.24 AS build
+FROM node:26.13.1-alpine3.24 AS build
 WORKDIR /app
 
 # Lockfile first so the dependency layer is cached until dependencies change.
