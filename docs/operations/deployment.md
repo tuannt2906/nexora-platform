@@ -15,7 +15,7 @@ Servers never receive source code, never build images, and never run `latest`.
 
 | Component | Image | Port | State |
 |-----------|-------|------|-------|
-| `web` (static React bundle, nginx-unprivileged) | `<registry>/web:<sha>` | 8080 | stateless |
+| `web` (static React bundle, Alpine nginx as non-root) | `<registry>/web:<sha>` | 8080 | stateless |
 | `control-plane` (FastAPI, uvicorn) | `<registry>/control-plane:<sha>` | 8000 | stateless |
 | `migrate` (one-shot: `python -m nexora_control_plane.migrate`) | same image as `control-plane` | - | runs to completion |
 | PostgreSQL 16 | `postgres:16.16-bookworm` (compose) or managed service | 5432 | **the only datastore** |

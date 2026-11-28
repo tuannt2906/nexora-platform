@@ -70,6 +70,6 @@ All versions are pinned exactly (`.npmrc`: `save-exact=true`, `engine-strict=tru
 ## Container
 
 `infra/docker/web.Dockerfile` (build context = repo root) builds the bundle and serves it with
-`nginxinc/nginx-unprivileged` on port **8080** as a non-root user. nginx proxies `/api/` to
+Alpine's `nginx` package (non-root uid 101, own `nginx.conf` and entrypoint) on port **8080** as a non-root user. nginx proxies `/api/` to
 `NEXORA_API_UPSTREAM` (default `http://control-plane:8000`) and answers `/healthz` itself.
 For a read-only root filesystem mount writable volumes at `/tmp` and `/etc/nginx/conf.d`.

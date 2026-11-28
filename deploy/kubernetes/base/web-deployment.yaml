@@ -25,7 +25,7 @@ spec:
       automountServiceAccountToken: false
       securityContext:
         runAsNonRoot: true
-        runAsUser: 101 # nginx-unprivileged user
+        runAsUser: 101 # nginx user (uid 101) in the web image
         runAsGroup: 101
         fsGroup: 101
         seccompProfile:
