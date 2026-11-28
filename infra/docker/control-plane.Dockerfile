@@ -50,6 +50,11 @@ LABEL org.opencontainers.image.title="nexora-control-plane" \
 RUN groupadd --system --gid 10001 nexora \
  && useradd --system --uid 10001 --gid 10001 --no-create-home --shell /usr/sbin/nologin nexora
 
+# OS security fixes published after the base image was built (rebuilds pick up the newest ones).
+RUN apt-get update \
+ && apt-get upgrade -y --no-install-recommends \
+ && rm -rf /var/lib/apt/lists/*
+
 # Same for the base image's own interpreter (setuptools/wheel are not used at runtime).
 RUN /usr/local/bin/python -m pip uninstall -y setuptools wheel
 

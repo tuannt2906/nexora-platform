@@ -28,7 +28,9 @@ LABEL org.opencontainers.image.title="nexora-web" \
 # Apply OS security fixes published after the base image was built. Trade-off: a rebuild is
 # not bit-for-bit reproducible, but it never ships known-fixable CVEs (the CI scan enforces it).
 USER root
-RUN apk upgrade --no-cache
+RUN apk upgrade --no-cache \
+ && apk add --no-cache --upgrade nginx \
+ && nginx -v
 
 # Control Plane address used by the /api/ reverse proxy (override at runtime).
 ENV NEXORA_API_UPSTREAM=http://control-plane:8000
