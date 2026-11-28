@@ -1,0 +1,60 @@
+name: Stack smoke test
+
+# Builds both images from the checked-out commit, starts the whole compose stack (PostgreSQL,
+# migration, control plane, web) with throwaway secrets and runs the same smoke test used after a
+# real deployment. This is what proves the containers work together, not merely that they start.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: stack-smoke-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  compose:
+    name: Compose stack end-to-end
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: deploy/compose
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Create throwaway environment file
+        run: |
+          umask 077
+          {
+            echo "NEXORA_IMAGE_REGISTRY=nexora-ci"
+            echo "NEXORA_IMAGE_TAG=ci-${GITHUB_SHA::12}"
+            echo "NEXORA_ENVIRONMENT=production"
+            echo "NEXORA_WEB_PORT=8080"
+            echo "NEXORA_POSTGRES_PASSWORD=$(openssl rand -hex 24)"
+            echo "NEXORA_API_TOKEN=$(openssl rand -hex 32)"
+          } > "$RUNNER_TEMP/nexora.env"
+      - name: Build and start the stack
+        run: >-
+          docker compose -f docker-compose.yml -f docker-compose.dev.yml
+          --env-file "$RUNNER_TEMP/nexora.env" up -d --build --wait --wait-timeout 300
+      - name: Show container state
+        run: docker compose -f docker-compose.yml --env-file "$RUNNER_TEMP/nexora.env" ps -a
+      - name: Smoke test through the web tier (nginx proxy to the API)
+        working-directory: .
+        run: |
+          set -a
+          . "$RUNNER_TEMP/nexora.env"
+          set +a
+          python3 tests/smoke/smoke.py --base-url "http://127.0.0.1:${NEXORA_WEB_PORT}" --token-env NEXORA_API_TOKEN
+      - name: Logs on failure
+        if: failure()
+        run: docker compose -f docker-compose.yml --env-file "$RUNNER_TEMP/nexora.env" logs --no-color --tail 200
+      - name: Tear down
+        if: always()
+        run: docker compose -f docker-compose.yml --env-file "$RUNNER_TEMP/nexora.env" down -v
