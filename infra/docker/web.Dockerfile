@@ -29,7 +29,7 @@ LABEL org.opencontainers.image.title="nexora-web" \
 # not bit-for-bit reproducible, but it never ships known-fixable CVEs (the CI scan enforces it).
 USER root
 RUN apk upgrade --no-cache \
- && apk add --no-cache --upgrade nginx \
+ && apk add --no-cache 'nginx>=1.30.7' \
  && nginx -v
 
 # Control Plane address used by the /api/ reverse proxy (override at runtime).
