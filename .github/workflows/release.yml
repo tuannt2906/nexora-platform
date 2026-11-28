@@ -51,10 +51,13 @@ jobs:
   scan-images:
     needs: verify-ref
     uses: ./.github/workflows/images.yml
+  stack-smoke:
+    needs: verify-ref
+    uses: ./.github/workflows/stack-smoke.yml
 
   publish:
     name: Publish immutable images
-    needs: [backend, frontend, validate, integration, security, scan-images]
+    needs: [backend, frontend, validate, integration, security, scan-images, stack-smoke]
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     permissions:

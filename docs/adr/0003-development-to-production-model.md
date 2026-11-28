@@ -19,7 +19,7 @@ runs on dedicated servers. The workstation has no production resources and must 
    approved deployment of an already-published image tag.
 4. Source code is never deployed. Servers pull **images** referenced by immutable tag (git SHA); the
    server's checkout of this repo supplies only deployment manifests at the same commit.
-5. PR validation (`backend-ci`, `frontend-ci`, `validate`, `integration`, `security`, `images`) is separate
+5. PR validation (`backend-ci`, `frontend-ci`, `validate`, `integration`, `security`, `images`, `stack-smoke`) is separate
    from release (`release.yml`) and deployment (`deploy.yml`, manual and approval-gated).
 6. Application code reads all environment-specific values from environment variables and contains no
    workstation paths or hardcoded development addresses (enforced by `make validate`).
