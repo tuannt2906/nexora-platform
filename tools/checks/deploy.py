@@ -574,7 +574,7 @@ def optional_steps(root: Path) -> list[Step]:
                     "image.tag=latest",
                 ],
                 cwd=root,
-                # schema errors name the JSON pointer (/image/tag); the template helper says image.tag
+                # schema errors use a JSON pointer (/image/tag); the helper says image.tag
                 expect_failure_containing=("image.tag", "/image/tag"),
             )
         )
