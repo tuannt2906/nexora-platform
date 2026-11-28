@@ -52,6 +52,11 @@ jobs:
           . "$RUNNER_TEMP/nexora.env"
           set +a
           python3 tests/smoke/smoke.py --base-url "http://127.0.0.1:${NEXORA_WEB_PORT}" --token-env NEXORA_API_TOKEN
+      - name: Metrics are served by the API on the internal network (not through the web tier)
+        run: >-
+          docker compose -f docker-compose.yml --env-file "$RUNNER_TEMP/nexora.env"
+          exec -T control-plane python -c
+          "import urllib.request,sys; sys.exit(0 if b'# HELP' in urllib.request.urlopen('http://127.0.0.1:8000/metrics', timeout=3).read() else 1)"
       - name: Logs on failure
         if: failure()
         run: docker compose -f docker-compose.yml --env-file "$RUNNER_TEMP/nexora.env" logs --no-color --tail 200
